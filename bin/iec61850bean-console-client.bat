@@ -4,4 +4,4 @@
 set BATDIR=%~dp0
 set LIBDIR="%BATDIR%..\build\libs-all\*"
 
-java -cp %LIBDIR% com.beanit.iec61850bean.app.ConsoleClient %*
+java -Djxer.asnDir=D:\project\work\standard\xer\asn -Dlogback.configurationFile=logback.xml -cp %LIBDIR% com.beanit.iec61850bean.app.ConsoleClient %*

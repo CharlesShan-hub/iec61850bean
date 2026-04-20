@@ -69,6 +69,14 @@ dependencies {
     implementation("com.beanit:asn1bean:1.12.0")
     implementation("org.slf4j:slf4j-api:1.7.25")
     runtimeOnly("ch.qos.logback:logback-classic:1.2.3")
+
+    // BER <-> APER codec
+    implementation("com.xer:jxer:1.0.0")
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
 }
 
 project.extra["cfgModuleName"] = "com.beanit.iec61850bean"

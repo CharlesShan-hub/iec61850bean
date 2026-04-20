@@ -4,7 +4,11 @@ IEC61850bean (previously known as OpenIEC61850) is a library implementing the IE
 For detailed information on IEC61850bean visit https://www.beanit.com/iec-61850/.
 
 服务器写一个数据
+```bash
+.\bin\iec61850bean-console-server.bat -m .\bin\sample-model.icd
+```
 
+```bash
 w
 Enter reference to write (e.g. myld/MYLN0.do.da.bda):
 ied1lDevice1/DSCH1.SchdSt.stVal
@@ -14,9 +18,15 @@ Enter value to write:
 100
 Successfully wrote data.
 ied1lDevice1/DSCH1.SchdSt.stVal: 100
+```
 
 客户端收一个数据
 
+```bash
+.\bin\iec61850bean-console-client.bat -h 127.0.0.1 -p 102
+```
+
+```bash
 g
 Enter reference (e.g. myld/MYLN0.do.da.bda):
 ied1lDevice1/DSCH1.SchdSt.stVal
@@ -25,6 +35,7 @@ ST
 Sending GetDataValues request...
 Successfully read data.
 ied1lDevice1/DSCH1.SchdSt.stVal: 100
+```
 
 客户端获取一个值下边是服务器发送的
 

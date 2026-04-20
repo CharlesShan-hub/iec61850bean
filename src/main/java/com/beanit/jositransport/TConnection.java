@@ -14,6 +14,7 @@
 package com.beanit.jositransport;
 
 import com.beanit.iec61850bean.internal.util.SequenceNumber;
+import com.xer.jxer.Asn1Converter;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -32,6 +33,26 @@ import org.slf4j.LoggerFactory;
 public final class TConnection {
 
   private static final Logger logger = LoggerFactory.getLogger(TConnection.class);
+
+  // Asn1Converter for BER <-> APER conversion
+  private static final boolean converterEnabled;
+
+  static {
+    String asnDir = System.getProperty("jxer.asnDir");
+    if (asnDir != null) {
+      try {
+        Asn1Converter.init(asnDir);
+        converterEnabled = true;
+        logger.info("Asn1Converter initialized with asnDir: {}", asnDir);
+      } catch (Exception e) {
+        logger.warn("Failed to init Asn1Converter: {}", e.getMessage());
+        throw new RuntimeException("jxer.asnDir is set but Asn1Converter init failed", e);
+      }
+    } else {
+      converterEnabled = false;
+      logger.debug("jxer.asnDir not set, BER/APER conversion disabled");
+    }
+  }
 
   // some servers do not like srcRef 0
   private static final SequenceNumber connectionCounter = new SequenceNumber(1, 1, 65519);
@@ -369,7 +390,7 @@ public final class TConnection {
   public void send(List<byte[]> tsdus, List<Integer> offsets, List<Integer> lengths)
       throws IOException {
 
-    // [PER-DEBUG] log send bytes
+    // [PER-DEBUG] log send bytes (before conversion)
     int total = 0;
     for (int l : lengths) total += l;
     logger.debug("[PER-DEBUG] TConnection.send totalBytes={}", total);
@@ -382,11 +403,51 @@ public final class TConnection {
       logger.debug("[PER-DEBUG]   tsdu[{}] {}{}", i, sb, lengths.get(i) > 128 ? "..." : "");
     }
 
+    // BER -> APER conversion if enabled
+    List<byte[]> sendTsdus = tsdus;
+    List<Integer> sendOffsets = offsets;
+    List<Integer> sendLengths = lengths;
+
+    if (converterEnabled && total > 0) {
+      try {
+        // Combine all tsdus into single BER hex
+        StringBuilder berHex = new StringBuilder();
+        for (int i = 0; i < tsdus.size(); i++) {
+          byte[] b = tsdus.get(i);
+          int off = offsets.get(i);
+          int len = lengths.get(i);
+          for (int j = off; j < off + len; j++) {
+            berHex.append(String.format("%02X", b[j]));
+          }
+        }
+
+        // Convert BER to APER
+        String aperHex = Asn1Converter.berToAper(berHex.toString());
+
+        // Convert hex string back to byte array
+        byte[] aperBytes = new byte[aperHex.length() / 2];
+        for (int i = 0; i < aperBytes.length; i++) {
+          aperBytes[i] = (byte) Integer.parseInt(aperHex.substring(i * 2, i * 2 + 2), 16);
+        }
+
+        sendTsdus = new ArrayList<>();
+        sendTsdus.add(aperBytes);
+        sendOffsets = new ArrayList<>();
+        sendOffsets.add(0);
+        sendLengths = new ArrayList<>();
+        sendLengths.add(aperBytes.length);
+
+        logger.debug("[PER-CONV] BER -> APER: {} bytes -> {} bytes", total, aperBytes.length);
+      } catch (Exception e) {
+        logger.warn("[PER-CONV] BER->APER conversion failed, sending original: {}", e.getMessage());
+      }
+    }
+
     int bytesLeft = 0;
     // for (byte[] tsdu : tsdus) {
     // bytesLeft += tsdu.length;
     // }
-    for (int length : lengths) {
+    for (int length : sendLengths) {
       bytesLeft += length;
     }
     int tsduOffset = 0;
@@ -425,9 +486,9 @@ public final class TConnection {
 
       bytesLeft -= numBytesToWrite;
       while (numBytesToWrite > 0) {
-        byte[] tsdu = tsdus.get(byteArrayListIndex);
-        int length = lengths.get(byteArrayListIndex);
-        int offset = offsets.get(byteArrayListIndex);
+        byte[] tsdu = sendTsdus.get(byteArrayListIndex);
+        int length = sendLengths.get(byteArrayListIndex);
+        int offset = sendOffsets.get(byteArrayListIndex);
 
         int tsduWriteLength = length - tsduOffset;
 
