@@ -410,25 +410,18 @@ public final class TConnection {
 
     if (converterEnabled && total > 0) {
       try {
-        // Combine all tsdus into single BER hex
-        StringBuilder berHex = new StringBuilder();
+        // Combine all tsdus into single BER byte[]
+        byte[] berBytes = new byte[total];
+        int pos = 0;
         for (int i = 0; i < tsdus.size(); i++) {
-          byte[] b = tsdus.get(i);
           int off = offsets.get(i);
           int len = lengths.get(i);
-          for (int j = off; j < off + len; j++) {
-            berHex.append(String.format("%02X", b[j]));
-          }
+          System.arraycopy(tsdus.get(i), off, berBytes, pos, len);
+          pos += len;
         }
 
-        // Convert BER to APER
-        String aperHex = Asn1Converter.berToAper(berHex.toString());
-
-        // Convert hex string back to byte array
-        byte[] aperBytes = new byte[aperHex.length() / 2];
-        for (int i = 0; i < aperBytes.length; i++) {
-          aperBytes[i] = (byte) Integer.parseInt(aperHex.substring(i * 2, i * 2 + 2), 16);
-        }
+        // Convert BER to APER (byte[] -> byte[])
+        byte[] aperBytes = Asn1Converter.berToAper(berBytes);
 
         sendTsdus = new ArrayList<>();
         sendTsdus.add(aperBytes);
