@@ -26,8 +26,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class TConnection {
+
+  private static final Logger logger = LoggerFactory.getLogger(TConnection.class);
 
   // some servers do not like srcRef 0
   private static final SequenceNumber connectionCounter = new SequenceNumber(1, 1, 65519);
@@ -365,6 +369,19 @@ public final class TConnection {
   public void send(List<byte[]> tsdus, List<Integer> offsets, List<Integer> lengths)
       throws IOException {
 
+    // [PER-DEBUG] log send bytes
+    int total = 0;
+    for (int l : lengths) total += l;
+    logger.debug("[PER-DEBUG] TConnection.send totalBytes={}", total);
+    for (int i = 0; i < tsdus.size(); i++) {
+      byte[] b = tsdus.get(i);
+      int off = offsets.get(i);
+      int len = Math.min(lengths.get(i), 128);
+      StringBuilder sb = new StringBuilder();
+      for (int j = off; j < off + len; j++) sb.append(String.format("%02X ", b[j]));
+      logger.debug("[PER-DEBUG]   tsdu[{}] {}{}", i, sb, lengths.get(i) > 128 ? "..." : "");
+    }
+
     int bytesLeft = 0;
     // for (byte[] tsdu : tsdus) {
     // bytesLeft += tsdu.length;
@@ -590,6 +607,14 @@ public final class TConnection {
 
     tSduBuffer.limit(tSduBuffer.position());
     tSduBuffer.reset();
+
+    // [PER-DEBUG] log receive bytes
+    int recvLen = tSduBuffer.limit();
+    logger.debug("[PER-DEBUG] TConnection.receive len={}", recvLen);
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < Math.min(recvLen, 128); i++)
+      sb.append(String.format("%02X ", tSduBuffer.get(i)));
+    logger.debug("[PER-DEBUG]   {}{}", sb, recvLen > 128 ? "..." : "");
   }
 
   /** This function sends a Disconnect Request but does not wait for a Disconnect Confirm. */
